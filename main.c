@@ -1,4 +1,3 @@
-#include <assert.h>
 //#include <http_parser.h>
 #include <stdlib.h>
 #include <uv.h>

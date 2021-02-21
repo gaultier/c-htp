@@ -6,10 +6,7 @@ static uv_loop_t* loop;
 
 typedef struct {
     uv_tcp_t tcp;
-    uv_connect_t connect_req;
-    uv_shutdown_t shutdown_req;
-    uv_buf_t data[10000];
-} pinger_t;
+} server_t;
 
 typedef struct buf_s {
     uv_buf_t uv_buf_t;
@@ -21,7 +18,7 @@ typedef struct {
     uv_buf_t buf;
 } write_req_t;
 
-static pinger_t pinger;
+static server_t server;
 
 static void on_client_close(uv_handle_t* handle) {
     uv_tcp_t* client = (uv_tcp_t*)handle;
@@ -68,7 +65,7 @@ static void alloc_cb(uv_handle_t* handle, size_t suggested_size,
 }
 
 static void on_connection(uv_stream_t* tcp, int status) {
-    pinger_t* pinger = tcp->data;
+    server_t* server = tcp->data;
     uv_tcp_t* client = NULL;
 
     if (status != 0) {
@@ -84,7 +81,7 @@ static void on_connection(uv_stream_t* tcp, int status) {
                 uv_strerror(status));
         goto err;
     }
-    if ((status = uv_accept((uv_stream_t*)&pinger->tcp,
+    if ((status = uv_accept((uv_stream_t*)&server->tcp,
                             (uv_stream_t*)client)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_accept: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
@@ -109,24 +106,24 @@ int main() {
     struct sockaddr_in addr;
     uv_ip4_addr("127.0.0.1", 8888, &addr);
 
-    pinger = (pinger_t){0};
+    server = (server_t){0};
     int status = 0;
 
-    if ((status = uv_tcp_init(loop, &pinger.tcp)) != 0) {
+    if ((status = uv_tcp_init(loop, &server.tcp)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_tcp_init: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         return status;
     }
 
-    pinger.tcp.data = &pinger;
+    server.tcp.data = &server;
 
-    if ((status = uv_tcp_bind(&pinger.tcp, (const struct sockaddr*)&addr, 0)) !=
+    if ((status = uv_tcp_bind(&server.tcp, (const struct sockaddr*)&addr, 0)) !=
         0) {
         fprintf(stderr, "%s:%d:Error uv_tcp_bind: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         return status;
     }
-    if ((status = uv_listen((uv_stream_t*)&pinger.tcp, 10, on_connection)) !=
+    if ((status = uv_listen((uv_stream_t*)&server.tcp, 10, on_connection)) !=
         0) {
         fprintf(stderr, "%s:%d:Error uv_listen: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));

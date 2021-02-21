@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <uv.h>
 
-static uv_loop_t* loop;
-
 typedef struct {
     uv_tcp_t tcp;
 } server_t;
@@ -74,7 +72,7 @@ static void on_connection(uv_stream_t* tcp, int status) {
 
     client = malloc(sizeof(uv_tcp_t));
 
-    if ((status = uv_tcp_init(loop, client)) != 0) {
+    if ((status = uv_tcp_init(uv_default_loop(), client)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_tcp_init: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         goto err;
@@ -99,15 +97,13 @@ err:
 }
 
 int main() {
-    loop = uv_default_loop();
-
     struct sockaddr_in addr;
     uv_ip4_addr("127.0.0.1", 8888, &addr);
 
     server_t server = {0};
     int status = 0;
 
-    if ((status = uv_tcp_init(loop, &server.tcp)) != 0) {
+    if ((status = uv_tcp_init(uv_default_loop(), &server.tcp)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_tcp_init: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         return status;
@@ -128,5 +124,5 @@ int main() {
         return status;
     }
 
-    return uv_run(loop, UV_RUN_DEFAULT);
+    return uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 }

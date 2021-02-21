@@ -47,6 +47,10 @@ static void echo_read(uv_stream_t* client, ssize_t nread, const uv_buf_t* buf) {
         }
         return;
     } else if (nread < 0) {
+        if (nread != UV_EOF) {
+            fprintf(stderr, "%s:%d:Error reading: %s\n", __FILE__, __LINE__,
+                    uv_strerror(nread));
+        }
         uv_close((uv_handle_t*)client, NULL);
     }
     free((void*)buf->base);

@@ -24,6 +24,11 @@ typedef struct {
 
 static pinger_t pinger;
 
+static void on_client_close(uv_handle_t* handle) {
+    uv_tcp_t* client = (uv_tcp_t*)handle;
+    free(client);
+}
+
 static void echo_write(uv_write_t* req, int status) {
     if (status != 0) {
         fprintf(stderr, "%s:%d:Error writing to the client: %s\n", __FILE__,
@@ -51,9 +56,9 @@ static void echo_read(uv_stream_t* client, ssize_t nread, const uv_buf_t* buf) {
             fprintf(stderr, "%s:%d:Error reading: %s\n", __FILE__, __LINE__,
                     uv_strerror(nread));
         }
-        uv_close((uv_handle_t*)client, NULL);
+        uv_close((uv_handle_t*)client, on_client_close);
     }
-    free((void*)buf->base);
+    if (buf) free((void*)buf->base);
 }
 
 static void alloc_cb(uv_handle_t* handle, size_t suggested_size,

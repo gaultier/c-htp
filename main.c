@@ -18,8 +18,6 @@ typedef struct {
     uv_buf_t buf;
 } write_req_t;
 
-static server_t server;
-
 static void on_client_close(uv_handle_t* handle) {
     uv_tcp_t* client = (uv_tcp_t*)handle;
     free(client);
@@ -106,7 +104,7 @@ int main() {
     struct sockaddr_in addr;
     uv_ip4_addr("127.0.0.1", 8888, &addr);
 
-    server = (server_t){0};
+    server_t server = {0};
     int status = 0;
 
     if ((status = uv_tcp_init(loop, &server.tcp)) != 0) {

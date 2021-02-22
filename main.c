@@ -16,10 +16,12 @@ typedef struct {
     uv_buf_t buf;
 } write_req_t;
 
-static void on_client_close(uv_handle_t* handle) {
-    uv_tcp_t* client = (uv_tcp_t*)handle;
-    free(client);
-}
+typedef struct {
+    uv_tcp_t tcp;
+    uv_timer_t timer;
+} client_t;
+
+static void on_client_close(uv_handle_t* handle) { free(handle); }
 
 static void echo_write(uv_write_t* req, int status) {
     if (status != 0) {
@@ -41,14 +43,17 @@ static void echo_read(uv_stream_t* client, ssize_t nread, const uv_buf_t* buf) {
                                echo_write)) != 0) {
             fprintf(stderr, "%s:%d:Error writing to the client: %s\n", __FILE__,
                     __LINE__, uv_strerror(status));
+            uv_timer_stop(&((client_t*)client)->timer);
+            uv_close((uv_handle_t*)client, on_client_close);
         }
         return;
     } else if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "%s:%d:Error reading: %s\n", __FILE__, __LINE__,
                     uv_strerror(nread));
+            uv_timer_stop(&((client_t*)client)->timer);
+            uv_close((uv_handle_t*)client, on_client_close);
         }
-        uv_close((uv_handle_t*)client, on_client_close);
     }
     if (buf) free((void*)buf->base);
 }
@@ -60,9 +65,15 @@ static void alloc_cb(uv_handle_t* handle, size_t suggested_size,
     buf->len = suggested_size;
 }
 
+static void connection_close_on_timeout(uv_timer_t* context) {
+    client_t* client = (client_t*)context->data;
+    printf("Closing connection on timeout\n");
+    uv_close((uv_handle_t*)&client->tcp, on_client_close);
+}
+
 static void on_connection(uv_stream_t* tcp, int status) {
     server_t* server = tcp->data;
-    uv_tcp_t* client = NULL;
+    client_t* client = NULL;
 
     if (status != 0) {
         fprintf(stderr, "%s:%d:Error on_connection: %s\n", __FILE__, __LINE__,
@@ -70,19 +81,30 @@ static void on_connection(uv_stream_t* tcp, int status) {
         goto err;
     }
 
-    client = malloc(sizeof(uv_tcp_t));
+    client = malloc(sizeof(client_t));
 
-    if ((status = uv_tcp_init(uv_default_loop(), client)) != 0) {
+    if ((status = uv_tcp_init(uv_default_loop(), &client->tcp)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_tcp_init: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         goto err;
     }
+    client->tcp.data = client;
     if ((status = uv_accept((uv_stream_t*)&server->tcp,
                             (uv_stream_t*)client)) != 0) {
         fprintf(stderr, "%s:%d:Error uv_accept: %s\n", __FILE__, __LINE__,
                 uv_strerror(status));
         goto err;
     }
+
+    if ((status = uv_timer_init(uv_default_loop(), &client->timer)) != 0) {
+        fprintf(stderr, "%s:%d:Error uv_timer_init: %s\n", __FILE__, __LINE__,
+                uv_strerror(status));
+        goto err;
+    }
+
+    client->timer.data = client;
+    uv_timer_start(&client->timer, connection_close_on_timeout, 1000, 0);
+
     if ((status = uv_read_start((uv_stream_t*)client, alloc_cb, echo_read)) !=
         0) {
         fprintf(stderr, "%s:%d:Error uv_read_start: %s\n", __FILE__, __LINE__,
@@ -92,7 +114,7 @@ static void on_connection(uv_stream_t* tcp, int status) {
 
 err:
     if (status != 0 && client != NULL) {
-        free(client);
+        uv_close((uv_handle_t*)client, on_client_close);
     }
 }
 

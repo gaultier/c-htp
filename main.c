@@ -1,15 +1,10 @@
-//#include <http_parser.h>
+#include <http_parser.h>
 #include <stdlib.h>
 #include <uv.h>
 
 typedef struct {
     uv_tcp_t tcp;
 } server_t;
-
-typedef struct buf_s {
-    uv_buf_t uv_buf_t;
-    struct buf_s* next;
-} buf_t;
 
 typedef struct {
     uv_write_t req;
@@ -19,7 +14,16 @@ typedef struct {
 typedef struct {
     uv_tcp_t tcp;
     uv_timer_t timer;
+    http_parser parser;
 } client_t;
+
+#define HTTP_OK                                  \
+    "HTTP/1.1 200 OK\r\n"                        \
+    "Content-Type: text/html; charset=UTF-8\r\n" \
+    "Content-Length: 19\r\n"                     \
+    "Connection: close\r\n"                      \
+    "\r\n"                                       \
+    "<html>Hello</html>"
 
 static void on_client_close(uv_handle_t* handle) { free(handle); }
 
@@ -29,32 +33,50 @@ static void echo_write(uv_write_t* req, int status) {
                 __LINE__, uv_strerror(status));
     }
     write_req_t* write_req = (write_req_t*)req;
-    free(write_req->buf.base);
+    /* free(write_req->buf.base); */
     free(write_req);
 }
 
-static void echo_read(uv_stream_t* client, ssize_t nread, const uv_buf_t* buf) {
+static void echo_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
+    client_t* client = stream->data;
+    http_parser_settings settings = {0};
+
     if (nread > 0) {
         write_req_t* req = malloc(sizeof(write_req_t));
-        req->buf = uv_buf_init(buf->base, nread);
+        req->buf = uv_buf_init(HTTP_OK, sizeof(HTTP_OK));
+
+        size_t parsed =
+            http_parser_execute(&client->parser, &settings, buf->base, nread);
+        if (client->parser.upgrade) {
+            goto err;
+        } else if (parsed != nread) {
+            goto err;
+        }
 
         int status;
-        if ((status = uv_write((uv_write_t*)req, client, &req->buf, 1,
+        if ((status = uv_write((uv_write_t*)req, stream, &req->buf, 1,
                                echo_write)) != 0) {
             fprintf(stderr, "%s:%d:Error writing to the client: %s\n", __FILE__,
                     __LINE__, uv_strerror(status));
-            uv_timer_stop(&((client_t*)client)->timer);
-            uv_close((uv_handle_t*)client, on_client_close);
+            goto err;
         }
         return;
     } else if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "%s:%d:Error reading: %s\n", __FILE__, __LINE__,
                     uv_strerror(nread));
-            uv_timer_stop(&((client_t*)client)->timer);
-            uv_close((uv_handle_t*)client, on_client_close);
+            goto err;
         }
+        size_t parsed =
+            http_parser_execute(&client->parser, &settings, buf->base, 0);
+        goto ok;
     }
+
+err:
+    uv_timer_stop(&client->timer);
+    uv_close((uv_handle_t*)stream, on_client_close);
+
+ok:
     if (buf) free((void*)buf->base);
 }
 
@@ -103,7 +125,7 @@ static void on_connection(uv_stream_t* tcp, int status) {
     }
 
     client->timer.data = client;
-    uv_timer_start(&client->timer, connection_close_on_timeout, 1000, 0);
+    uv_timer_start(&client->timer, connection_close_on_timeout, 5000, 0);
 
     if ((status = uv_read_start((uv_stream_t*)client, alloc_cb, echo_read)) !=
         0) {
@@ -111,6 +133,8 @@ static void on_connection(uv_stream_t* tcp, int status) {
                 uv_strerror(status));
         goto err;
     }
+    http_parser_init(&client->parser, HTTP_REQUEST);
+    client->parser.data = &client->tcp;
 
 err:
     if (status != 0 && client != NULL) {

@@ -104,18 +104,6 @@ static const char mkt_colors[2][COL_COUNT][14] = {
               [COL_RED] = "\x1b[31m",
               [COL_GREEN] = "\x1b[32m"}};
 
-static bool is_space(char c) {
-    return c == ' ' || c == '\n' || c == '\t' || c == '\r';
-}
-
-static void trim_end(const char** string, i32* string_len) {
-    CHECK((void*)string, !=, NULL, "%p");
-    CHECK((void*)string_len, !=, NULL, "%p");
-
-    while (*string_len > 0 && is_space((*string)[*string_len - 1]))
-        *string_len -= 1;
-}
-
 #define TRY_OK(expr)                   \
     do {                               \
         mkt_res_t res = expr;          \

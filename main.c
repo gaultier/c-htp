@@ -38,7 +38,7 @@ str_t str_from_c_str0_alloc(const char* c_str0) {
     CHECK((void*)c_str0, !=, NULL, "%p");
 
     const usize len = strlen(c_str0);
-    u8* s = malloc(len);
+    char* s = malloc(len);
     memcpy(s, c_str0, len);
     return (str_t){.str_len = len, .str_s = s};
 }
@@ -118,10 +118,10 @@ static void echo_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
     if (nread > 0) {
         write_req_t* req = malloc(sizeof(write_req_t));
         http_response_t response = {0};
-        str_t body = str_from_c_str0("Hello, world!") http_response_init(
-                         &response, HTTP_STATUS_OK, body, 1, ...)
+        str_t body = str_from_c_str0_alloc("Hello, world!");
+        http_response_init(&response, HTTP_STATUS_OK, body, 0);
 
-                         req->buf = uv_buf_init(HTTP_OK, sizeof(HTTP_OK) - 1);
+        req->buf = uv_buf_init(HTTP_OK, sizeof(HTTP_OK) - 1);
 
         size_t parsed =
             http_parser_execute(&client->parser, &settings, buf->base, nread);

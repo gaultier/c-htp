@@ -51,6 +51,11 @@ str_t str_from_c_str0_noalloc(char* c_str0) {
 
 str_t str_n(usize n) { return (str_t){.str_len = n, .str_s = calloc(n, 1)}; }
 
+void str_append(str_t a, str_t b) {
+    a.str_s = realloc(a.str_s, a.str_len + b.str_len);
+    a.str_len += b.str_len;
+}
+
 typedef struct {
     str_t hkv_key;
     str_t* hkv_values;
@@ -70,7 +75,11 @@ typedef struct {
     str_t hre_version;
 } http_response_t;
 
-void http_response_to_str(const http_response_t* response, str_t s){};
+void http_response_to_str(const http_response_t* response, str_t s) {
+    CHECK(s.str_len, ==, 0UL, "%zu");
+
+    // TODO
+};
 
 void http_response_init(http_response_t* response, http_status_t status,
                         str_t hre_body, i32 http_headers_count, ...) {
@@ -83,7 +92,7 @@ void http_response_init(http_response_t* response, http_status_t status,
     str_t* header_content_length_values = NULL;
     str_t header_content_length_value = str_n(26);
     snprintf(header_content_length_value.str_s,
-             header_content_length_value.str_len, "%llu", hre_body.str_len);
+             header_content_length_value.str_len, "%zu", hre_body.str_len);
     buf_push(header_content_length_values, header_content_length_value);
     http_header_t header_content_length = (http_header_t){
         .hkv_key = str_from_c_str0_noalloc(HDR_CONTENT_LENGTH),

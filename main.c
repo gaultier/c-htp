@@ -1,6 +1,10 @@
 #include <http_parser.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <uv.h>
+
+#include "buf.h"
+#include "common.h"
 
 typedef struct {
     uv_tcp_t tcp;
@@ -25,6 +29,76 @@ typedef struct {
     "\r\n"                                       \
     "<html>Hello</html>"
 
+typedef struct {
+    usize str_len;
+    char* str_s;
+} str_t;
+
+str_t str_from_c_str0_alloc(const char* c_str0) {
+    CHECK((void*)c_str0, !=, NULL, "%p");
+
+    const usize len = strlen(c_str0);
+    u8* s = malloc(len);
+    memcpy(s, c_str0, len);
+    return (str_t){.str_len = len, .str_s = s};
+}
+
+str_t str_from_c_str0_noalloc(char* c_str0) {
+    CHECK((void*)c_str0, !=, NULL, "%p");
+
+    return (str_t){.str_len = strlen(c_str0), .str_s = c_str0};
+}
+
+str_t str_n(usize n) { return (str_t){.str_len = n, .str_s = calloc(n, 1)}; }
+
+typedef struct {
+    str_t hkv_key;
+    str_t* hkv_values;
+} http_header_t;
+
+#define HTTP11 "HTTP/1.1"
+
+static const char HDR_CONTENT_TYPE[] = "Content-Type";
+static const char HDR_CONTENT_LENGTH[] = "Content-Length";
+
+typedef enum http_status http_status_t;
+
+typedef struct {
+    http_header_t* hre_headers;
+    http_status_t hre_status;
+    str_t hre_body;
+    str_t hre_version;
+} http_response_t;
+
+void http_response_to_str(const http_response_t* response, str_t s){};
+
+void http_response_init(http_response_t* response, http_status_t status,
+                        str_t hre_body, i32 http_headers_count, ...) {
+    CHECK((void*)response, !=, NULL, "%p");
+
+    response->hre_status = status;
+    response->hre_body = hre_body;
+    response->hre_version = str_from_c_str0_noalloc(HTTP11);
+
+    str_t* header_content_length_values = NULL;
+    str_t header_content_length_value = str_n(26);
+    snprintf(header_content_length_value.str_s,
+             header_content_length_value.str_len, "%llu", hre_body.str_len);
+    buf_push(header_content_length_values, header_content_length_value);
+    http_header_t header_content_length = (http_header_t){
+        .hkv_key = str_from_c_str0_noalloc(HDR_CONTENT_LENGTH),
+    };
+    buf_push(response->hre_headers, header_content_length);
+
+    va_list ap;
+    va_start(ap, http_headers_count);
+
+    for (; http_headers_count; http_headers_count--) {
+        http_header_t header = va_arg(ap, http_header_t);
+        buf_push(response->hre_headers, header);
+    }
+}
+
 static void on_client_close(uv_handle_t* handle) { free(handle); }
 
 static void echo_write(uv_write_t* req, int status) {
@@ -43,7 +117,11 @@ static void echo_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
 
     if (nread > 0) {
         write_req_t* req = malloc(sizeof(write_req_t));
-        req->buf = uv_buf_init(HTTP_OK, sizeof(HTTP_OK));
+        http_response_t response = {0};
+        str_t body = str_from_c_str0("Hello, world!") http_response_init(
+                         &response, HTTP_STATUS_OK, body, 1, ...)
+
+                         req->buf = uv_buf_init(HTTP_OK, sizeof(HTTP_OK) - 1);
 
         size_t parsed =
             http_parser_execute(&client->parser, &settings, buf->base, nread);

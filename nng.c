@@ -1,4 +1,4 @@
-#define REST_URL "http://127.0.0.1:%u/api/rest/rot13"
+#define REST_URL "http://127.0.0.1:%u"
 
 #include <ctype.h>
 #include <nng/nng.h>
@@ -16,65 +16,6 @@
 /*   exit(1); */
 /* } */
 
-///* typedef struct rest_job { */
-/*   nng_aio *http_aio;       // aio from HTTP we must reply to */
-/*   nng_http_res *http_res;  // HTTP response object */
-/*   job_state state;         // 0 = sending, 1 = receiving */
-/*   nng_msg *msg;            // request message */
-/*   nng_aio *aio;            // request flow */
-/*   nng_ctx ctx;             // context on the request socket */
-/*   struct rest_job *next;   // next on the freelist */
-/* } rest_job; */
-
-nng_socket req_sock;
-
-// We maintain a queue of free jobs.  This way we don't have to
-// deallocate them from the callback; we just reuse them.
-/* nng_mtx *job_lock; */
-/* rest_job *job_freelist; */
-
-/* static void rest_job_cb(void *arg); */
-
-/* static void rest_recycle_job(rest_job *job) { */
-/*   if (job->http_res != NULL) { */
-/*     nng_http_res_free(job->http_res); */
-/*     job->http_res = NULL; */
-/*   } */
-/*   if (job->msg != NULL) { */
-/*     nng_msg_free(job->msg); */
-/*     job->msg = NULL; */
-/*   } */
-/*   if (nng_ctx_id(job->ctx) != 0) { */
-/*     nng_ctx_close(job->ctx); */
-/*   } */
-
-/*   nng_mtx_lock(job_lock); */
-/*   job->next = job_freelist; */
-/*   job_freelist = job; */
-/*   nng_mtx_unlock(job_lock); */
-/* } */
-
-/* static rest_job *rest_get_job(void) { */
-/*   rest_job *job; */
-
-/*   nng_mtx_lock(job_lock); */
-/*   if ((job = job_freelist) != NULL) { */
-/*     job_freelist = job->next; */
-/*     nng_mtx_unlock(job_lock); */
-/*     job->next = NULL; */
-/*     return (job); */
-/*   } */
-/*   nng_mtx_unlock(job_lock); */
-/*   if ((job = calloc(1, sizeof(*job))) == NULL) { */
-/*     return (NULL); */
-/*   } */
-/*   if (nng_aio_alloc(&job->aio, rest_job_cb, job) != 0) { */
-/*     free(job); */
-/*     return (NULL); */
-/*   } */
-/*   return (job); */
-/* } */
-
 /* static void rest_http_fatal(rest_job *job, const char *fmt, int rv) { */
 /*   char buf[128]; */
 /*   nng_aio *aio = job->http_aio; */
@@ -88,25 +29,6 @@ nng_socket req_sock;
 /*   nng_aio_set_output(aio, 0, res); */
 /*   nng_aio_finish(aio, 0); */
 /*   /1* rest_recycle_job(job); *1/ */
-/* } */
-
-/* static void rest_job_cb(void *arg) { */
-/*   rest_job *job = arg; */
-/*   int rv; */
-
-/*   static char data[] = "hello"; */
-/*   rv = nng_http_res_set_data(job->http_res, data, 5); */
-/*   if (rv != 0) { */
-/*     rest_http_fatal(job, "nng_http_res_copy_data: %s", rv); */
-/*     return; */
-/*   } */
-/*   // Set the output - the HTTP server will send it back to the */
-/*   // user agent with a 200 response. */
-/*   /1* job->http_aio = NULL; *1/ */
-/*   /1* job->http_res = NULL; *1/ */
-/*   // We are done with the job. */
-/*   /1* rest_recycle_job(job); *1/ */
-/*   return; */
 /* } */
 
 // Our rest server just takes the message body, creates a request ID
@@ -183,8 +105,7 @@ void rest_start(uint16_t port) {
   nng_url_free(url);
 }
 
-int main(int argc, char **argv) {
-  int rv;
+int main() {
   uint16_t port = 0;
 
   if (getenv("PORT") != NULL) {

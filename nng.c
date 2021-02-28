@@ -31,8 +31,6 @@
 /*   /1* rest_recycle_job(job); *1/ */
 /* } */
 
-// Our rest server just takes the message body, creates a request ID
-// for it, and sends it on.  This runs in raw mode, so
 void rest_handle(nng_aio *aio) {
   nng_http_req *req = nng_aio_get_input(aio, 0);
   /* nng_http_conn *conn = nng_aio_get_input(aio, 2); */
@@ -40,13 +38,8 @@ void rest_handle(nng_aio *aio) {
   int rv;
   void *data;
 
-  /* if ((job = rest_get_job()) == NULL) { */
-  /*   nng_aio_finish(aio, NNG_ENOMEM); */
-  /*   return; */
-  /* } */
   nng_http_res *http_res;
   if (((rv = nng_http_res_alloc(&http_res)) != 0)) {
-    /* rest_recycle_job(job); */
     nng_aio_finish(aio, rv);
     return;
   }

@@ -1,7 +1,5 @@
 #include <ctype.h>
 #include <nng/nng.h>
-#include <nng/protocol/reqrep0/rep.h>
-#include <nng/protocol/reqrep0/req.h>
 #include <nng/supplemental/http/http.h>
 #include <nng/supplemental/util/platform.h>
 #include <stdio.h>
@@ -67,7 +65,7 @@ static void rest_start(u16 port) {
   {
     // Allocate the handler - we use a dynamic handler for REST
     // using the function "rest_handle" declared above.
-    rv = nng_http_handler_alloc(&handler, url->u_path, rest_handle);
+    rv = nng_http_handler_alloc(&handler, "/", rest_handle);
     if (rv != 0) {
       fatal("nng_http_handler_alloc", rv);
     }
@@ -96,6 +94,8 @@ static void rest_start(u16 port) {
   if ((rv = nng_http_server_start(server)) != 0) {
     fatal("nng_http_server_start", rv);
   }
+
+  nng_url_free(url);
 }
 
 int main() {

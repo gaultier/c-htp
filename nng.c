@@ -51,11 +51,9 @@ static void rest_start(u16 port) {
   nng_url *url;
   int rv;
 
-  // Set up some strings, etc.  We use the port number
-  // from the argument list.
-  static char url_s[50];
-  snprintf(url_s, sizeof(url_s), "http://0.0.0.0:%hu", port);
-  if ((rv = nng_url_parse(&url, url_s)) != 0) {
+  static char base_url[50];
+  snprintf(base_url, sizeof(base_url), "http://0.0.0.0:%hu", port);
+  if ((rv = nng_url_parse(&url, base_url)) != 0) {
     fatal("nng_url_parse", rv);
   }
 
@@ -65,32 +63,39 @@ static void rest_start(u16 port) {
     fatal("nng_http_server_hold", rv);
   }
 
-  // Allocate the handler - we use a dynamic handler for REST
-  // using the function "rest_handle" declared above.
-  rv = nng_http_handler_alloc(&handler, url->u_path, rest_handle);
-  if (rv != 0) {
-    fatal("nng_http_handler_alloc", rv);
+  // `/`
+  {
+    // Allocate the handler - we use a dynamic handler for REST
+    // using the function "rest_handle" declared above.
+    rv = nng_http_handler_alloc(&handler, url->u_path, rest_handle);
+    if (rv != 0) {
+      fatal("nng_http_handler_alloc", rv);
+    }
+    if ((rv = nng_http_handler_set_method(handler, "POST")) != 0) {
+      fatal("nng_http_handler_set_method", rv);
+    }
+    if ((rv = nng_http_handler_collect_body(handler, true, 1024 * 128)) != 0) {
+      fatal("nng_http_handler_collect_body", rv);
+    }
+    if ((rv = nng_http_server_add_handler(server, handler)) != 0) {
+      fatal("nng_http_server_add_handler", rv);
+    }
+  }
+  // `/home`
+  {
+    nng_http_handler *home_handler;
+    rv = nng_http_handler_alloc_file(&home_handler, "/home", "home.html");
+    if (rv != 0) {
+      fatal("nng_http_handler_alloc", rv);
+    }
+    if ((rv = nng_http_server_add_handler(server, home_handler)) != 0) {
+      fatal("nng_http_server_add_handler", rv);
+    }
   }
 
-  if ((rv = nng_http_handler_set_method(handler, "POST")) != 0) {
-    fatal("nng_http_handler_set_method", rv);
-  }
-  // We want to collect the body, and we (arbitrarily) limit this to
-  // 128KB.  The default limit is 1MB.  You can explicitly collect
-  // the data yourself with another HTTP read transaction by disabling
-  // this, but that's a lot of work, especially if you want to handle
-  // chunked transfers.
-  if ((rv = nng_http_handler_collect_body(handler, true, 1024 * 128)) != 0) {
-    fatal("nng_http_handler_collect_body", rv);
-  }
-  if ((rv = nng_http_server_add_handler(server, handler)) != 0) {
-    fatal("nng_http_server_add_handler", rv);
-  }
   if ((rv = nng_http_server_start(server)) != 0) {
     fatal("nng_http_server_start", rv);
   }
-
-  nng_url_free(url);
 }
 
 int main() {

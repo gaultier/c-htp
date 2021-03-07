@@ -30,7 +30,10 @@ typedef struct {
 project_t *projects = NULL;
 
 void project_init(project_t *project, char *api_url) {
+  project->pf_name = sdsempty();
+  project->pf_path_with_namespace = sdsempty();
   project->pf_api_url = sdsnew(api_url);
+  project->pf_api_data = sdsempty();
 }
 
 #define NUM_URLS sizeof(urls) / sizeof(char *)
@@ -40,11 +43,10 @@ static size_t write_cb(char *data, size_t n, size_t l, void *userp) {
   (void)data;
 
   const i64 project_i = (i64)userp;
-  project_t project = projects[project_i];
-  fprintf(stderr, "[%s] %.*s\n", project.pf_api_url, (int)(n * l), data);
+  project_t *project = &projects[project_i];
+  fprintf(stderr, "[%s] %.*s\n", project->pf_api_url, (int)(n * l), data);
+  project->pf_api_data = sdscatlen(project->pf_api_data, data, n * l);
 
-  /* jsmntok_t t[512] = {0}; */
-  /* int res = jsmn_parse(&parser, s, strlen(s), t, 128); */
   return n * l;
 }
 

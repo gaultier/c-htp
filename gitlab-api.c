@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <curl/curl.h>
 #include <errno.h>
 #include <stdint.h>
@@ -25,6 +26,7 @@ typedef struct {
 project_t *projects = NULL;
 
 void project_init(project_t *project, i64 id) {
+  project->pf_id = id;
   project->pf_name = sdsempty();
   project->pf_path_with_namespace = sdsempty();
   project->pf_api_url =
@@ -33,16 +35,33 @@ void project_init(project_t *project, i64 id) {
 }
 
 void project_parse_json(project_t *project) {
+  jsmntok_t *tokens = NULL;
   jsmn_parser parser;
   jsmn_init(&parser);
 
-  jsmntok_t tokens[512] = {0};
   int res = jsmn_parse(&parser, project->pf_api_data,
                        sdslen(project->pf_api_data), NULL, 0);
   if (res <= 0) {
-    fprintf(stderr, "Failed to parse project info: \n");
-    return;
+    fprintf(stderr, "%s:%d:Failed to parse project info: id=%lld res=%d\n",
+            __FILE__, __LINE__, project->pf_id, res);
+    goto end;
   }
+
+  tokens = calloc(res, sizeof(jsmntok_t));
+  assert(tokens);
+
+  jsmn_parse(&parser, project->pf_api_data, sdslen(project->pf_api_data),
+             tokens, res);
+  if (tokens[0].type != JSMN_OBJECT) {
+    fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
+            __LINE__, project->pf_id);
+    goto end;
+  }
+
+  printf("JSON project: id=%lld tokens=%lld\n", project->pf_id, res);
+
+end:
+  if (tokens) free(tokens);
 }
 
 static size_t write_cb(char *data, size_t n, size_t l, void *userp) {

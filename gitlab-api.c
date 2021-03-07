@@ -46,9 +46,6 @@ void project_parse_json(project_t *project) {
 }
 
 static size_t write_cb(char *data, size_t n, size_t l, void *userp) {
-  /* take care of the data here, ignored in this example */
-  (void)data;
-
   const i64 project_i = (i64)userp;
   project_t *project = &projects[project_i];
   fprintf(stderr, "[%s] %.*s\n", project->pf_api_url, (int)(n * l), data);

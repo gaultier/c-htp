@@ -7,14 +7,12 @@
 
 #include "deps/buf/buf.h"
 #include "deps/jsmn/jsmn.h"
+#include "deps/sds/sds.c"
+#include "deps/sds/sds.h"
+#include "deps/sds/sdsalloc.h"
 
 typedef int64_t i64;
 typedef uint64_t u64;
-
-typedef struct {
-  char *str_s;
-  u64 str_len;
-} string_t;
 
 static const char *urls[] = {
     "https://gitlab.com/api/v4/projects/3472737",
@@ -23,19 +21,16 @@ static const char *urls[] = {
 
 typedef struct {
   i64 pf_id;
-  string_t pf_name;
-  string_t pf_path_with_namespace;
-  string_t pf_api_url;
-  int pf_state;
-  jsmn_parser pf_parser;
+  sds pf_name;
+  sds pf_path_with_namespace;
+  sds pf_api_url;
+  sds pf_api_data;
 } project_t;
 
 project_t *projects = NULL;
 
 void project_init(project_t *project, char *api_url) {
-  jsmn_init(&project->pf_parser);
-  project->pf_api_url =
-      (string_t){.str_len = strlen(api_url), .str_s = api_url};
+  project->pf_api_url = sdsnew(api_url);
 }
 
 #define NUM_URLS sizeof(urls) / sizeof(char *)
@@ -45,10 +40,8 @@ static size_t write_cb(char *data, size_t n, size_t l, void *userp) {
   (void)data;
 
   const i64 project_i = (i64)userp;
-  printf("[D001] %d\n", project_i);
   project_t project = projects[project_i];
-  fprintf(stderr, "[%.*s]  %.*s\n", (int)project.pf_api_url.str_len,
-          project.pf_api_url.str_s, (int)(n * l), data);
+  fprintf(stderr, "[%s] %.*s\n", project.pf_api_url, (int)(n * l), data);
 
   /* jsmntok_t t[512] = {0}; */
   /* int res = jsmn_parse(&parser, s, strlen(s), t, 128); */

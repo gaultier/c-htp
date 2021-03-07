@@ -4,3 +4,6 @@
 [submodule "deps/jsmn"]
 	path = deps/jsmn
 	url = https://github.com/zserge/jsmn.git
+[submodule "deps/sds"]
+	path = deps/sds
+	url = https://github.com/antirez/sds.git

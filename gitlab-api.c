@@ -1,21 +1,57 @@
 #include <curl/curl.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "deps/buf/buf.h"
+#include "deps/jsmn/jsmn.h"
+
+typedef int64_t i64;
+typedef uint64_t u64;
+
+typedef struct {
+  char *str_s;
+  u64 str_len;
+} string_t;
 
 static const char *urls[] = {
     "https://gitlab.com/api/v4/projects/3472737",
     "https://gitlab.com/api/v4/projects/278964",
 };
 
+typedef struct {
+  i64 pf_id;
+  string_t pf_name;
+  string_t pf_path_with_namespace;
+  string_t pf_api_url;
+  int pf_state;
+  jsmn_parser pf_parser;
+} project_t;
+
+project_t *projects = NULL;
+
+void project_init(project_t *project, char *api_url) {
+  jsmn_init(&project->pf_parser);
+  project->pf_api_url =
+      (string_t){.str_len = strlen(api_url), .str_s = api_url};
+}
+
 #define NUM_URLS sizeof(urls) / sizeof(char *)
 
 static size_t write_cb(char *data, size_t n, size_t l, void *userp) {
   /* take care of the data here, ignored in this example */
   (void)data;
-  (void)userp;
-  fprintf(stderr, "%s: %.*s\n", (char *)userp, (int)(n * l), data);
+
+  const i64 project_i = (i64)userp;
+  printf("[D001] %d\n", project_i);
+  project_t project = projects[project_i];
+  fprintf(stderr, "[%.*s]  %.*s\n", (int)project.pf_api_url.str_len,
+          project.pf_api_url.str_s, (int)(n * l), data);
+
+  /* jsmntok_t t[512] = {0}; */
+  /* int res = jsmn_parse(&parser, s, strlen(s), t, 128); */
   return n * l;
 }
 
@@ -23,14 +59,13 @@ static void add_transfer(CURLM *cm, int i) {
   CURL *eh = curl_easy_init();
   curl_easy_setopt(eh, CURLOPT_WRITEFUNCTION, write_cb);
   curl_easy_setopt(eh, CURLOPT_URL, urls[i]);
-  curl_easy_setopt(eh, CURLOPT_PRIVATE, urls[i]);
+  curl_easy_setopt(eh, CURLOPT_WRITEDATA, i);
   curl_multi_add_handle(cm, eh);
 }
 
 int main() {
   CURLM *cm;
   CURLMsg *msg;
-  unsigned int transfers = 0;
   int msgs_left = -1;
   int still_alive = 1;
 
@@ -40,8 +75,12 @@ int main() {
   /* Limit the amount of simultaneous connections curl should allow: */
   curl_multi_setopt(cm, CURLMOPT_MAXCONNECTS, NUM_URLS);
 
-  for (transfers = 0; transfers < NUM_URLS; transfers++)
-    add_transfer(cm, transfers);
+  for (i64 i = 0; i < (i64)NUM_URLS; i++) {
+    project_t project = {0};
+    project_init(&project, (char *)urls[i]);
+    buf_push(projects, project);
+    add_transfer(cm, i);
+  }
 
   do {
     curl_multi_perform(cm, &still_alive);
@@ -58,9 +97,8 @@ int main() {
       } else {
         fprintf(stderr, "E: CURLMsg (%d)\n", msg->msg);
       }
-      if (transfers < NUM_URLS) add_transfer(cm, transfers++);
     }
     if (still_alive) curl_multi_wait(cm, NULL, 0, 1000, NULL);
 
-  } while (still_alive || (transfers < NUM_URLS));
+  } while (still_alive);
 }

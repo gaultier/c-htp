@@ -35,8 +35,6 @@ project_t *projects = NULL;
 
 void project_init(project_t *project, i64 id) {
   project->pf_id = id;
-  project->pf_name = NULL;
-  project->pf_path_with_namespace = NULL;
   project->pf_api_url =
       sdscatprintf(sdsempty(), "https://gitlab.com/api/v4/projects/%lld", id);
   project->pf_api_data = sdsempty();

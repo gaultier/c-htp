@@ -94,27 +94,11 @@ static void add_transfer(CURLM *cm, int i) {
   curl_multi_add_handle(cm, eh);
 }
 
-int main() {
-  CURLM *cm;
+static void projects_fetch(CURLM *cm) {
   CURLMsg *msg;
-  int msgs_left = -1;
+
   int still_alive = 1;
-  i64 *project_ids = NULL;
-  buf_push(project_ids, 3472737);
-  buf_push(project_ids, 278964);
-
-  curl_global_init(CURL_GLOBAL_ALL);
-  cm = curl_multi_init();
-
-  for (u64 i = 0; i < buf_size(project_ids); i++) {
-    const i64 id = project_ids[i];
-
-    project_t project = {0};
-    project_init(&project, id);
-    buf_push(projects, project);
-    add_transfer(cm, i);
-  }
-
+  int msgs_left = -1;
   do {
     curl_multi_perform(cm, &still_alive);
 
@@ -127,10 +111,6 @@ int main() {
         fprintf(stderr, "R: %d - %s <%s>\n", msg->data.result,
                 curl_easy_strerror(msg->data.result), project->pf_api_url);
         if (msg->data.result == 0) {
-          project_parse_json(project);
-          printf("Project: id=%lld path_with_namespace=%s name=%s\n",
-                 project->pf_id, project->pf_path_with_namespace,
-                 project->pf_name);
         }
         curl_multi_remove_handle(cm, e);
         curl_easy_cleanup(e);
@@ -141,4 +121,30 @@ int main() {
     if (still_alive) curl_multi_wait(cm, NULL, 0, 1000, NULL);
 
   } while (still_alive);
+}
+
+int main() {
+  i64 *project_ids = NULL;
+  buf_push(project_ids, 3472737);
+  buf_push(project_ids, 278964);
+
+  curl_global_init(CURL_GLOBAL_ALL);
+
+  CURLM *cm = curl_multi_init();
+  for (u64 i = 0; i < buf_size(project_ids); i++) {
+    const i64 id = project_ids[i];
+
+    project_t project = {0};
+    project_init(&project, id);
+    buf_push(projects, project);
+    add_transfer(cm, i);
+  }
+  projects_fetch(cm);
+
+  for (u64 i = 0; i < buf_size(project_ids); i++) {
+    project_t *project = &projects[i];
+    project_parse_json(project);
+    printf("Project: id=%lld path_with_namespace=%s name=%s\n", project->pf_id,
+           project->pf_path_with_namespace, project->pf_name);
+  }
 }

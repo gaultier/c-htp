@@ -17,8 +17,8 @@ typedef uint64_t u64;
 
 jsmntok_t *json_tokens;
 
-static int json_eq(const char *json, jsmntok_t *tok, const char *s) {
-  if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
+static int json_eq(const char *json, jsmntok_t *tok, const char *s, u64 s_len) {
+  if (tok->type == JSMN_STRING && ((int)s_len == tok->end - tok->start) &&
       strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
     return 0;
   }
@@ -66,12 +66,13 @@ static void project_parse_json(project_t *project) {
     jsmntok_t *const tok = &json_tokens[i];
     if (tok->type != JSMN_STRING) continue;
 
-    if (json_eq(s, tok, "name") == 0) {
+    if (json_eq(s, tok, "name", sizeof("name") - 1) == 0) {
       project->pf_name =
           sdsnewlen(s + json_tokens[i + 1].start,
                     json_tokens[i + 1].end - json_tokens[i + 1].start);
       i++;
-    } else if (json_eq(s, tok, "path_with_namespace") == 0) {
+    } else if (json_eq(s, tok, "path_with_namespace",
+                       sizeof("path_with_namespace") - 1) == 0) {
       project->pf_path_with_namespace =
           sdsnewlen(s + json_tokens[i + 1].start,
                     json_tokens[i + 1].end - json_tokens[i + 1].start);
@@ -97,7 +98,22 @@ static void project_parse_pipelines_json(project_t *project) {
 
   for (i64 i = 1; i < res; i++) {
     jsmntok_t *const tok = &json_tokens[i];
-    if (tok->type != JSMN_OBJECT) continue;
+    if (tok->type == JSMN_OBJECT) {
+      continue;
+    }
+
+    if (json_eq(project->pf_api_data, tok, "id", sizeof("id") - 1) == 0) {
+      i++;
+      const jsmntok_t *const t = &json_tokens[i];
+      if (t->type != JSMN_PRIMITIVE) {
+        fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
+                __LINE__, project->pf_id);
+        return;
+      }
+
+      sds id_s = sdsnewlen(project->pf_api_data + t->start, t->end - t->start);
+      printf("Pipeline id=%s\n", id_s);
+    }
   }
 }
 

@@ -57,7 +57,7 @@ static void project_parse_json(project_t *project) {
   if (res <= 0 || project->pf_json_tokens[0].type != JSMN_OBJECT) {
     fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
             __LINE__, project->pf_id);
-    goto end;
+    return;
   }
 
   for (i64 i = 1; i < res; i++) {
@@ -77,9 +77,6 @@ static void project_parse_json(project_t *project) {
       i++;
     }
   }
-
-end:
-  sdsclear(project->pf_api_data);
 }
 
 static void project_parse_pipelines_json(project_t *project) {
@@ -95,16 +92,13 @@ static void project_parse_pipelines_json(project_t *project) {
   if (res <= 0 || project->pf_json_tokens[0].type != JSMN_ARRAY) {
     fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
             __LINE__, project->pf_id);
-    goto end;
+    return;
   }
 
   for (i64 i = 1; i < res; i++) {
     jsmntok_t *const tok = &project->pf_json_tokens[i];
     if (tok->type != JSMN_OBJECT) continue;
   }
-
-end:
-  sdsclear(project->pf_api_data);
 }
 
 static size_t write_cb(char *data, size_t n, size_t l, void *userp) {
@@ -196,6 +190,7 @@ int main() {
   {
     cm = curl_multi_init();
     for (u64 i = 0; i < buf_size(project_ids); i++) {
+      sdsclear(projects[i].pf_api_data);
       project_pipelines_fetch_queue(cm, i);
     }
     projects_fetch(cm);

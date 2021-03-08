@@ -123,6 +123,30 @@ static void project_parse_pipelines_json(project_t *project) {
       const char *const value = project->pro_api_data + t->start;
       pipeline->pip_vcs_ref = sdsnewlen(value, t->end - t->start);
     }
+    if (json_eq(project->pro_api_data, tok, "created_at",
+                sizeof("created_at") - 1) == 0) {
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
+      pipeline->pip_created_at = sdsnewlen(value, t->end - t->start);
+    }
+    if (json_eq(project->pro_api_data, tok, "updated_at",
+                sizeof("updated_at") - 1) == 0) {
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
+      pipeline->pip_updated_at = sdsnewlen(value, t->end - t->start);
+    }
+    if (json_eq(project->pro_api_data, tok, "status", sizeof("status") - 1) ==
+        0) {
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
+      pipeline->pip_status = sdsnewlen(value, t->end - t->start);
+    }
+    if (json_eq(project->pro_api_data, tok, "web_url", sizeof("web_url") - 1) ==
+        0) {
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
+      pipeline->pip_url = sdsnewlen(value, t->end - t->start);
+    }
   }
 }
 
@@ -229,8 +253,12 @@ int main() {
 
       for (u64 j = 0; j < buf_size(project->pro_pipelines); j++) {
         const pipeline_t *const pipeline = &project->pro_pipelines[j];
-        printf("[%lld] Pipeline: id=%lld ref=%s\n", project->pro_id,
-               pipeline->pip_id, pipeline->pip_vcs_ref);
+        printf(
+            "[%lld] Pipeline: id=%lld ref=%s created_at=%s updated_at=%s "
+            "status=%s url=%s\n",
+            project->pro_id, pipeline->pip_id, pipeline->pip_vcs_ref,
+            pipeline->pip_created_at, pipeline->pip_updated_at,
+            pipeline->pip_status, pipeline->pip_url);
       }
     }
   }

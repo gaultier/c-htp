@@ -33,14 +33,14 @@ typedef struct {
 
 project_t *projects = NULL;
 
-void project_init(project_t *project, i64 id) {
+static void project_init(project_t *project, i64 id) {
   project->pf_id = id;
   project->pf_api_url =
       sdscatprintf(sdsempty(), "https://gitlab.com/api/v4/projects/%lld", id);
   project->pf_api_data = sdsempty();
 }
 
-void project_parse_json(project_t *project) {
+static void project_parse_json(project_t *project) {
   jsmntok_t *tokens = calloc(sdslen(project->pf_api_data), sizeof(jsmntok_t));
   assert(tokens);
 

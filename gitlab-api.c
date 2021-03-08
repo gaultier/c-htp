@@ -15,6 +15,8 @@
 typedef int64_t i64;
 typedef uint64_t u64;
 
+jsmntok_t *json_tokens;
+
 static int json_eq(const char *json, jsmntok_t *tok, const char *s) {
   if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
       strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
@@ -32,7 +34,6 @@ typedef struct {
   i64 pf_id;
   sds pf_name, pf_path_with_namespace, pf_api_url, pf_api_data,
       pf_api_pipelines_url;
-  jsmntok_t *pf_json_tokens;
 } project_t;
 
 project_t *projects = NULL;
@@ -47,58 +48,55 @@ static void project_init(project_t *project, i64 id) {
 }
 
 static void project_parse_json(project_t *project) {
-  buf_clear(project->pf_json_tokens);
-  buf_trunc(project->pf_json_tokens, sdslen(project->pf_api_data));
+  buf_clear(json_tokens);
 
   jsmn_parser parser;
   jsmn_init(&parser);
 
   const char *const s = project->pf_api_data;
-  int res = jsmn_parse(&parser, s, sdslen((char *)s), project->pf_json_tokens,
+  int res = jsmn_parse(&parser, s, sdslen((char *)s), json_tokens,
                        sdslen(project->pf_api_data));
-  if (res <= 0 || project->pf_json_tokens[0].type != JSMN_OBJECT) {
+  if (res <= 0 || json_tokens[0].type != JSMN_OBJECT) {
     fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
             __LINE__, project->pf_id);
     return;
   }
 
   for (i64 i = 1; i < res; i++) {
-    jsmntok_t *const tok = &project->pf_json_tokens[i];
+    jsmntok_t *const tok = &json_tokens[i];
     if (tok->type != JSMN_STRING) continue;
 
     if (json_eq(s, tok, "name") == 0) {
-      project->pf_name = sdsnewlen(s + project->pf_json_tokens[i + 1].start,
-                                   project->pf_json_tokens[i + 1].end -
-                                       project->pf_json_tokens[i + 1].start);
+      project->pf_name =
+          sdsnewlen(s + json_tokens[i + 1].start,
+                    json_tokens[i + 1].end - json_tokens[i + 1].start);
       i++;
     } else if (json_eq(s, tok, "path_with_namespace") == 0) {
       project->pf_path_with_namespace =
-          sdsnewlen(s + project->pf_json_tokens[i + 1].start,
-                    project->pf_json_tokens[i + 1].end -
-                        project->pf_json_tokens[i + 1].start);
+          sdsnewlen(s + json_tokens[i + 1].start,
+                    json_tokens[i + 1].end - json_tokens[i + 1].start);
       i++;
     }
   }
 }
 
 static void project_parse_pipelines_json(project_t *project) {
-  buf_clear(project->pf_json_tokens);
-  buf_trunc(project->pf_json_tokens, sdslen(project->pf_api_data));
+  buf_clear(json_tokens);
 
   jsmn_parser parser;
   jsmn_init(&parser);
 
   const char *const s = project->pf_api_data;
-  int res = jsmn_parse(&parser, s, sdslen((char *)s), project->pf_json_tokens,
+  int res = jsmn_parse(&parser, s, sdslen((char *)s), json_tokens,
                        sdslen(project->pf_api_data));
-  if (res <= 0 || project->pf_json_tokens[0].type != JSMN_ARRAY) {
+  if (res <= 0 || json_tokens[0].type != JSMN_ARRAY) {
     fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
             __LINE__, project->pf_id);
     return;
   }
 
   for (i64 i = 1; i < res; i++) {
-    jsmntok_t *const tok = &project->pf_json_tokens[i];
+    jsmntok_t *const tok = &json_tokens[i];
     if (tok->type != JSMN_OBJECT) continue;
   }
 }
@@ -163,6 +161,8 @@ int main() {
   buf_push(project_ids, 278964);
 
   curl_global_init(CURL_GLOBAL_ALL);
+
+  buf_trunc(json_tokens, 10 * 1024);  // 10 KiB
 
   CURLM *cm;
 

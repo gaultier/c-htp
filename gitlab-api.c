@@ -17,7 +17,8 @@ typedef uint64_t u64;
 
 jsmntok_t *json_tokens;
 
-static int json_eq(const char *json, jsmntok_t *tok, const char *s, u64 s_len) {
+static int json_eq(const char *json, const jsmntok_t *tok, const char *s,
+                   u64 s_len) {
   if (tok->type == JSMN_STRING && ((int)s_len == tok->end - tok->start) &&
       strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
     return 0;
@@ -99,7 +100,7 @@ static void project_parse_pipelines_json(project_t *project) {
 
   pipeline_t *pipeline = NULL;
   for (i64 i = 1; i < res; i++) {
-    jsmntok_t *const tok = &json_tokens[i];
+    const jsmntok_t *const tok = &json_tokens[i];
     if (tok->type == JSMN_OBJECT) {
       buf_push(project->pro_pipelines, ((pipeline_t){0}));
       pipeline = &project->pro_pipelines[buf_size(project->pro_pipelines) - 1];
@@ -107,17 +108,20 @@ static void project_parse_pipelines_json(project_t *project) {
     }
 
     if (json_eq(project->pro_api_data, tok, "id", sizeof("id") - 1) == 0) {
-      i++;
-      const jsmntok_t *const t = &json_tokens[i];
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
       if (t->type != JSMN_PRIMITIVE) {
         fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
                 __LINE__, project->pro_id);
         return;
       }
 
-      const char *const value = project->pro_api_data + t->start;
       pipeline->pip_id = strtoll(value, NULL, 10);
-      printf("Pipeline id=%lld\n", pipeline->pip_id);
+    }
+    if (json_eq(project->pro_api_data, tok, "ref", sizeof("ref") - 1) == 0) {
+      const jsmntok_t *const t = &json_tokens[++i];
+      const char *const value = project->pro_api_data + t->start;
+      pipeline->pip_vcs_ref = sdsnewlen(value, t->end - t->start);
     }
   }
 }
@@ -222,6 +226,12 @@ int main() {
     for (u64 i = 0; i < buf_size(project_ids); i++) {
       project_t *project = &projects[i];
       project_parse_pipelines_json(project);
+
+      for (u64 j = 0; j < buf_size(project->pro_pipelines); j++) {
+        const pipeline_t *const pipeline = &project->pro_pipelines[j];
+        printf("[%lld] Pipeline: id=%lld ref=%s\n", project->pro_id,
+               pipeline->pip_id, pipeline->pip_vcs_ref);
+      }
     }
   }
 }

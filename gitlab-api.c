@@ -73,6 +73,8 @@ void project_parse_json(project_t *project) {
 
 end:
   free(tokens);
+  sdsfree(project->pf_api_data);
+  sdsfree(project->pf_api_url);
 }
 
 static size_t write_cb(char *data, size_t n, size_t l, void *userp) {

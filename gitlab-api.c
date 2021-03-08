@@ -24,12 +24,14 @@ static int json_eq(const char *json, jsmntok_t *tok, const char *s) {
 }
 
 typedef struct {
+  i64 pip_id;
+  sds pip_vcs_ref, pip_url, pip_created_at, pip_updated_at, pip_status;
+} pipeline_t;
+
+typedef struct {
   i64 pf_id;
-  sds pf_name;
-  sds pf_path_with_namespace;
-  sds pf_api_url;
-  sds pf_api_data;
-  sds pf_api_pipelines_url;
+  sds pf_name, pf_path_with_namespace, pf_api_url, pf_api_data,
+      pf_api_pipelines_url;
   jsmntok_t *pf_json_tokens;
 } project_t;
 

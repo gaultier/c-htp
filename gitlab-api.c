@@ -35,8 +35,8 @@ project_t *projects = NULL;
 
 void project_init(project_t *project, i64 id) {
   project->pf_id = id;
-  project->pf_name = sdsempty();
-  project->pf_path_with_namespace = sdsempty();
+  project->pf_name = NULL;
+  project->pf_path_with_namespace = NULL;
   project->pf_api_url =
       sdscatprintf(sdsempty(), "https://gitlab.com/api/v4/projects/%lld", id);
   project->pf_api_data = sdsempty();
@@ -50,29 +50,26 @@ void project_parse_json(project_t *project) {
   jsmn_init(&parser);
 
   const char *const s = project->pf_api_data;
-  int res = jsmn_parse(&parser, s, sdslen((char *)s), NULL, 0);
+  int res = jsmn_parse(&parser, s, sdslen((char *)s), tokens,
+                       sdslen(project->pf_api_data));
   if (res <= 0 || tokens[0].type != JSMN_OBJECT) {
-    fprintf(stderr,
-            "%s:%d:Malformed JSON for project: id=%lld res=%d data=`%s`\n",
-            __FILE__, __LINE__, project->pf_id, res, s);
+    fprintf(stderr, "%s:%d:Malformed JSON for project: id=%lld\n", __FILE__,
+            __LINE__, project->pf_id);
     goto end;
   }
-  printf("JSON project: id=%lld tokens=%lld data=`%s`\n", project->pf_id, res,
-         s);
-
-  for (i64 i = 0; i < res; i++)
-    printf("[%lld] token=%d\n", project->pf_id, tokens[i].type);
 
   for (i64 i = 1; i < res; i++) {
-    jsmntok_t *tok = &tokens[i];
+    jsmntok_t *const tok = &tokens[i];
     if (tok->type != JSMN_STRING) continue;
 
-    const u64 len = tok->end - tok->start;
     if (json_eq(s, tok, "name") == 0) {
-      project->pf_name = sdscatlen(project->pf_name, s + tok->start, len);
+      project->pf_name = sdsnewlen(s + tokens[i + 1].start,
+                                   tokens[i + 1].end - tokens[i + 1].start);
+      i++;
     } else if (json_eq(s, tok, "path_with_namespace") == 0) {
-      project->pf_path_with_namespace =
-          sdscatlen(project->pf_path_with_namespace, s + tok->start, len);
+      project->pf_path_with_namespace = sdsnewlen(
+          s + tokens[i + 1].start, tokens[i + 1].end - tokens[i + 1].start);
+      i++;
     }
   }
 
@@ -109,7 +106,7 @@ int main() {
   curl_global_init(CURL_GLOBAL_ALL);
   cm = curl_multi_init();
 
-  for (i64 i = 0; i < buf_size(project_ids); i++) {
+  for (u64 i = 0; i < buf_size(project_ids); i++) {
     const i64 id = project_ids[i];
 
     project_t project = {0};

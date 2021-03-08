@@ -95,27 +95,25 @@ static void add_transfer(CURLM *cm, int i) {
 }
 
 static void projects_fetch(CURLM *cm) {
-  CURLMsg *msg;
-
   int still_alive = 1;
   int msgs_left = -1;
   do {
     curl_multi_perform(cm, &still_alive);
 
+    CURLMsg *msg;
     while ((msg = curl_multi_info_read(cm, &msgs_left))) {
+      CURL *e = msg->easy_handle;
+      i64 project_i = 0;
+      curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &project_i);
+      project_t *project = &projects[project_i];
       if (msg->msg == CURLMSG_DONE) {
-        CURL *e = msg->easy_handle;
-        i64 project_i = 0;
-        curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &project_i);
-        project_t *project = &projects[project_i];
         fprintf(stderr, "R: %d - %s <%s>\n", msg->data.result,
                 curl_easy_strerror(msg->data.result), project->pf_api_url);
-        if (msg->data.result == 0) {
-        }
         curl_multi_remove_handle(cm, e);
         curl_easy_cleanup(e);
       } else {
-        fprintf(stderr, "E: CURLMsg (%d)\n", msg->msg);
+        fprintf(stderr, "Failed to fetch project information: id=%lld err=%d\n",
+                projects->pf_id, msg->msg);
       }
     }
     if (still_alive) curl_multi_wait(cm, NULL, 0, 1000, NULL);
